@@ -1,0 +1,51 @@
+
+{
+  "name": "siteorigin/panels",
+  "type": "wordpress-plugin",
+  "keywords": [
+    "wordpress",
+    "page-builder",
+    "admin",
+    "builder",
+    "responsive"
+  ],
+  "version": "3.9.1",
+  "description": "Build responsive page layouts using the widgets you know and love using this simple drag and drop page builder.",
+  "homepage": "http://siteorigin.com/page-builder/",
+  "license": "GPLv2",
+  "minimum-stability": "dev",
+  "authors": [
+    {
+      "name": "Greg Priday",
+      "email": "support@siteorigin.com",
+      "homepage": "http://siteorigin.com/",
+      "role": "WordPress Developer"
+    }
+  ],
+  "dist": {
+    "url": "https://github.com/UsabilityDynamics/siteorigin-panels/archive/master.zip",
+    "type": "zip"
+  },
+  "source": {
+    "url": "git@github.com:UsabilityDynamics/siteorigin-panels",
+    "type": "git",
+    "reference": "master"
+  },  
+  "autoload": {
+    "classmap": [
+      "widgets/basic.php",
+      "widgets/widgets/testiomonial/testimonial.php",
+      "widgets/widgets/price-box/price-box.php",
+      "widgets/widgets/list/list.php",
+      "widgets/widgets/call-to-action/call-to-action.php",
+      "widgets/widgets/button/button.php",
+      "widgets/widgets/animated-image/animated-image.php",
+      "widgets/lib/color.php"
+    ]
+  },
+  "extra": {
+    "installer-name": "siteorigin-panels",
+    "main-file": "siteorigin-panels.php",
+    "text_domain": "siteorigin-panels"
+  }  
+}
