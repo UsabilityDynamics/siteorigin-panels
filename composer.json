@@ -38,7 +38,7 @@
   "autoload": {
     "classmap": [
       "widgets/basic.php",
-      "widgets/widgets/testiomonial/testimonial.php",
+      "widgets/widgets/testimonial/testimonial.php",
       "widgets/widgets/price-box/price-box.php",
       "widgets/widgets/list/list.php",
       "widgets/widgets/call-to-action/call-to-action.php",
