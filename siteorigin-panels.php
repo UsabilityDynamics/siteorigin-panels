@@ -207,6 +207,117 @@ function siteorigin_panels_metabox_render( $post ) {
 	include plugin_dir_path(__FILE__) . 'tpl/metabox-panels.php';
 }
 
+function _siteorigin_panels_styles( $panels_data = null ) {
+  global $wp_version;
+
+  wp_enqueue_style( 'so-panels-admin', plugins_url( 'css/admin.css', __DIR__ ), array( ), SITEORIGIN_PANELS_VERSION );
+
+  if( version_compare( $wp_version, '3.9.beta.1', '<' ) ) {
+    // Versions before 3.9 need some custom jQuery UI styling
+    wp_enqueue_style( 'so-panels-admin-jquery-ui', plugins_url( 'css/jquery-ui.css', __DIR__ ), array(), SITEORIGIN_PANELS_VERSION );
+  }
+  else {
+    wp_enqueue_style( 'wp-jquery-ui-dialog' );
+  }
+
+  wp_enqueue_style( 'so-panels-chosen', plugins_url(  'js/chosen/chosen.css', __DIR__ ), array(), SITEORIGIN_PANELS_VERSION );
+
+  do_action( 'siteorigin_panel_enqueue_admin_styles' );
+
+}
+
+function _siteorigin_panels_scripts( $panels_data = null ) {
+
+  if( did_action( 'admin_print_scripts' ) && !current_action( 'admin_print_scripts' ) ) {
+    _doing_it_wrong( '_siteorigin_panels_scripts', __( 'You are trying to load assets too late, must do so before "admin_print_scripts" action.' ), null );
+  }
+
+  wp_enqueue_script( 'jquery-ui-resizable' );
+  wp_enqueue_script( 'jquery-ui-sortable' );
+  wp_enqueue_script( 'jquery-ui-dialog' );
+  wp_enqueue_script( 'jquery-ui-button' );
+
+  wp_enqueue_script( 'so-undomanager', plugin_dir_url(__FILE__) . 'js/undomanager.min.js', array( ), 'fb30d7f', true );
+  wp_enqueue_script( 'so-panels-chosen', plugin_dir_url(__FILE__) . 'js/chosen/chosen.jquery.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+
+  wp_enqueue_script( 'so-panels-admin', plugin_dir_url(__FILE__) . 'js/panels.admin.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+  wp_enqueue_script( 'so-panels-admin-panels', plugin_dir_url(__FILE__) . 'js/panels.admin.panels.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+  wp_enqueue_script( 'so-panels-admin-grid', plugin_dir_url(__FILE__) . 'js/panels.admin.grid.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+  wp_enqueue_script( 'so-panels-admin-prebuilt', plugin_dir_url(__FILE__) . 'js/panels.admin.prebuilt.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+  wp_enqueue_script( 'so-panels-admin-tooltip', plugin_dir_url(__FILE__) . 'js/panels.admin.tooltip.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+  wp_enqueue_script( 'so-panels-admin-media', plugin_dir_url(__FILE__) . 'js/panels.admin.media.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+  wp_enqueue_script( 'so-panels-admin-styles', plugin_dir_url(__FILE__) . 'js/panels.admin.styles.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
+
+  wp_localize_script( 'so-panels-admin', 'panels', array(
+    'previewUrl' => wp_nonce_url(add_query_arg('siteorigin_panels_preview', 'true', get_home_url()), 'siteorigin-panels-preview'),
+    'i10n' => array(
+      'buttons' => array(
+        'insert' => __( 'Insert', 'siteorigin-panels' ),
+        'cancel' => __( 'cancel', 'siteorigin-panels' ),
+        'delete' => __( 'Delete', 'siteorigin-panels' ),
+        'duplicate' => __( 'Duplicate', 'siteorigin-panels' ),
+        'edit' => __( 'Edit', 'siteorigin-panels' ),
+        'done' => __( 'Done', 'siteorigin-panels' ),
+        'undo' => __( 'Undo', 'siteorigin-panels' ),
+        'add' => __( 'Add', 'siteorigin-panels' ),
+      ),
+      'messages' => array(
+        'deleteColumns' => __( 'Columns deleted', 'siteorigin-panels' ),
+        'deleteWidget' => __( 'Widget deleted', 'siteorigin-panels' ),
+        'confirmLayout' => __( 'Are you sure you want to load this layout? It will overwrite your current page.', 'siteorigin-panels' ),
+        'editWidget' => __('Edit %s Widget', 'siteorigin-panels')
+      ),
+    ),
+  ) );
+
+  $panels_data = $panels_data ? $panels_data : siteorigin_panels_get_current_admin_panels_data();
+
+  if( !empty( $panels_data['widgets'] ) ) {
+    wp_localize_script( 'so-panels-admin', 'panelsData', $panels_data );
+  }
+
+  // Let themes and plugins give names and descriptions to missing widgets.
+  global $wp_widget_factory;
+  $missing_widgets = array();
+  if ( !empty( $panels_data['widgets'] ) ) {
+    foreach ( $panels_data['widgets'] as $i => $widget ) {
+
+      // There's a chance the widget was activated by siteorigin_panels_widget_is_missing
+      if ( empty( $wp_widget_factory->widgets[ $widget['info']['class'] ] ) ) {
+        $missing_widgets[$widget['info']['class']] = apply_filters('siteorigin_panels_missing_widget_data', array(
+          'title' => str_replace( '_', ' ', $widget['info']['class'] ),
+          'description' => __('Install the missing widget', 'siteorigin-panels'),
+        ), $widget['info']['class']);
+      }
+    }
+  }
+
+  if( !empty($missing_widgets) ) {
+    wp_localize_script( 'so-panels-admin', 'panelsMissingWidgets', $missing_widgets );
+  }
+
+  // Set up the row styles
+  wp_localize_script( 'so-panels-admin', 'panelsStyleFields', siteorigin_panels_style_get_fields() );
+
+  if( siteorigin_panels_style_is_using_color() ) {
+    wp_enqueue_script( 'wp-color-picker');
+    wp_enqueue_style( 'wp-color-picker' );
+  }
+
+  // Render all the widget forms. A lot of widgets use this as a chance to enqueue their scripts
+  $original_post = isset($GLOBALS['post']) ? $GLOBALS['post'] : null; // Make sure widgets don't change the global post.
+  foreach($GLOBALS['wp_widget_factory']->widgets as $class => $widget_obj){
+    ob_start();
+    $widget_obj->form( array() );
+    ob_clean();
+  }
+  $GLOBALS['post'] = $original_post;
+
+  // This gives panels a chance to enqueue scripts too, without having to check the screen ID.
+  do_action( 'siteorigin_panel_enqueue_admin_scripts' );
+  do_action( 'sidebar_admin_setup' );
+
+}
 
 /**
  * Enqueue the panels admin scripts
@@ -219,94 +330,13 @@ function siteorigin_panels_admin_enqueue_scripts($prefix) {
 	$screen = get_current_screen();
 
 	if ( ( $screen->base == 'post' && in_array( $screen->id, siteorigin_panels_setting('post-types') ) ) || $screen->base == 'appearance_page_so_panels_home_page') {
-		wp_enqueue_script( 'jquery-ui-resizable' );
-		wp_enqueue_script( 'jquery-ui-sortable' );
-		wp_enqueue_script( 'jquery-ui-dialog' );
-		wp_enqueue_script( 'jquery-ui-button' );
-
-		wp_enqueue_script( 'so-undomanager', plugin_dir_url(__FILE__) . 'js/undomanager.min.js', array( ), 'fb30d7f', true );
-		wp_enqueue_script( 'so-panels-chosen', plugin_dir_url(__FILE__) . 'js/chosen/chosen.jquery.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-
-		wp_enqueue_script( 'so-panels-admin', plugin_dir_url(__FILE__) . 'js/panels.admin.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-		wp_enqueue_script( 'so-panels-admin-panels', plugin_dir_url(__FILE__) . 'js/panels.admin.panels.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-		wp_enqueue_script( 'so-panels-admin-grid', plugin_dir_url(__FILE__) . 'js/panels.admin.grid.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-		wp_enqueue_script( 'so-panels-admin-prebuilt', plugin_dir_url(__FILE__) . 'js/panels.admin.prebuilt.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-		wp_enqueue_script( 'so-panels-admin-tooltip', plugin_dir_url(__FILE__) . 'js/panels.admin.tooltip.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-		wp_enqueue_script( 'so-panels-admin-media', plugin_dir_url(__FILE__) . 'js/panels.admin.media.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-		wp_enqueue_script( 'so-panels-admin-styles', plugin_dir_url(__FILE__) . 'js/panels.admin.styles.min.js', array( 'jquery' ), SITEORIGIN_PANELS_VERSION, true );
-
-		wp_localize_script( 'so-panels-admin', 'panels', array(
-			'previewUrl' => wp_nonce_url(add_query_arg('siteorigin_panels_preview', 'true', get_home_url()), 'siteorigin-panels-preview'),
-			'i10n' => array(
-				'buttons' => array(
-					'insert' => __( 'Insert', 'siteorigin-panels' ),
-					'cancel' => __( 'cancel', 'siteorigin-panels' ),
-					'delete' => __( 'Delete', 'siteorigin-panels' ),
-					'duplicate' => __( 'Duplicate', 'siteorigin-panels' ),
-					'edit' => __( 'Edit', 'siteorigin-panels' ),
-					'done' => __( 'Done', 'siteorigin-panels' ),
-					'undo' => __( 'Undo', 'siteorigin-panels' ),
-					'add' => __( 'Add', 'siteorigin-panels' ),
-				),
-				'messages' => array(
-					'deleteColumns' => __( 'Columns deleted', 'siteorigin-panels' ),
-					'deleteWidget' => __( 'Widget deleted', 'siteorigin-panels' ),
-					'confirmLayout' => __( 'Are you sure you want to load this layout? It will overwrite your current page.', 'siteorigin-panels' ),
-					'editWidget' => __('Edit %s Widget', 'siteorigin-panels')
-				),
-			),
-		) );
-
-		$panels_data = siteorigin_panels_get_current_admin_panels_data();
-		if( !empty( $panels_data['widgets'] ) ) {
-			wp_localize_script( 'so-panels-admin', 'panelsData', $panels_data );
-		}
-
-		// Let themes and plugins give names and descriptions to missing widgets.
-		global $wp_widget_factory;
-		$missing_widgets = array();
-		if ( !empty( $panels_data['widgets'] ) ) {
-			foreach ( $panels_data['widgets'] as $i => $widget ) {
-
-				// There's a chance the widget was activated by siteorigin_panels_widget_is_missing
-				if ( empty( $wp_widget_factory->widgets[ $widget['info']['class'] ] ) ) {
-					$missing_widgets[$widget['info']['class']] = apply_filters('siteorigin_panels_missing_widget_data', array(
-						'title' => str_replace( '_', ' ', $widget['info']['class'] ),
-						'description' => __('Install the missing widget', 'siteorigin-panels'),
-					), $widget['info']['class']);
-				}
-			}
-		}
-
-		if( !empty($missing_widgets) ) {
-			wp_localize_script( 'so-panels-admin', 'panelsMissingWidgets', $missing_widgets );
-		}
-
-		// Set up the row styles
-		wp_localize_script( 'so-panels-admin', 'panelsStyleFields', siteorigin_panels_style_get_fields() );
-		if( siteorigin_panels_style_is_using_color() ) {
-			wp_enqueue_script( 'wp-color-picker');
-			wp_enqueue_style( 'wp-color-picker' );
-		}
-
-		// Render all the widget forms. A lot of widgets use this as a chance to enqueue their scripts
-		$original_post = isset($GLOBALS['post']) ? $GLOBALS['post'] : null; // Make sure widgets don't change the global post.
-		foreach($GLOBALS['wp_widget_factory']->widgets as $class => $widget_obj){
-			ob_start();
-			$widget_obj->form( array() );
-			ob_clean();
-		}
-		$GLOBALS['post'] = $original_post;
-
-		// This gives panels a chance to enqueue scripts too, without having to check the screen ID.
-		do_action( 'siteorigin_panel_enqueue_admin_scripts' );
-		do_action( 'sidebar_admin_setup' );
+    _siteorigin_panels_scripts();
 	}
+
 }
 add_action( 'admin_print_scripts-post-new.php', 'siteorigin_panels_admin_enqueue_scripts' );
 add_action( 'admin_print_scripts-post.php', 'siteorigin_panels_admin_enqueue_scripts' );
 add_action( 'admin_print_scripts-appearance_page_so_panels_home_page', 'siteorigin_panels_admin_enqueue_scripts' );
-
 
 /**
  * Enqueue the admin panel styles
@@ -317,19 +347,7 @@ add_action( 'admin_print_scripts-appearance_page_so_panels_home_page', 'siteorig
 function siteorigin_panels_admin_enqueue_styles() {
 	$screen = get_current_screen();
 	if ( in_array( $screen->id, siteorigin_panels_setting('post-types') ) || $screen->base == 'appearance_page_so_panels_home_page') {
-		wp_enqueue_style( 'so-panels-admin', plugin_dir_url(__FILE__) . 'css/admin.css', array( ), SITEORIGIN_PANELS_VERSION );
-
-		global $wp_version;
-		if( version_compare( $wp_version, '3.9.beta.1', '<' ) ) {
-			// Versions before 3.9 need some custom jQuery UI styling
-			wp_enqueue_style( 'so-panels-admin-jquery-ui', plugin_dir_url(__FILE__) . 'css/jquery-ui.css', array(), SITEORIGIN_PANELS_VERSION );
-		}
-		else {
-			wp_enqueue_style( 'wp-jquery-ui-dialog' );
-		}
-
-		wp_enqueue_style( 'so-panels-chosen', plugin_dir_url(__FILE__) . 'js/chosen/chosen.css', array(), SITEORIGIN_PANELS_VERSION );
-		do_action( 'siteorigin_panel_enqueue_admin_styles' );
+    _siteorigin_panels_styles();
 	}
 }
 add_action( 'admin_print_styles-post-new.php', 'siteorigin_panels_admin_enqueue_styles' );
@@ -420,8 +438,8 @@ function siteorigin_panels_get_current_admin_panels_data(){
 	}
 	else{
 		global $post;
-		$panels_data = get_post_meta( $post->ID, 'panels_data', true );
-		$panels_data = apply_filters( 'siteorigin_panels_data', $panels_data, $post->ID );
+		$panels_data = isset( $post ) ? get_post_meta( $post->ID, 'panels_data', true ) : null;
+		$panels_data = apply_filters( 'siteorigin_panels_data', $panels_data, is_object( $post ) ? $post->ID : null );
 	}
 
 	if ( empty( $panels_data ) ) $panels_data = array();
@@ -942,7 +960,7 @@ add_filter('body_class', 'siteorigin_panels_body_class');
  * Enqueue the required styles
  */
 function siteorigin_panels_enqueue_styles(){
-	wp_register_style('siteorigin-panels-front', plugin_dir_url(__FILE__) . 'css/front.css', array(), SITEORIGIN_PANELS_VERSION );
+	wp_register_style('siteorigin-panels-front', plugins_url( 'css/front.css', __DIR__ ), array(), SITEORIGIN_PANELS_VERSION );
 }
 add_action('wp_enqueue_scripts', 'siteorigin_panels_enqueue_styles', 1);
 
