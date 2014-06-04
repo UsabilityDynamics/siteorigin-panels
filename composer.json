@@ -10,6 +10,10 @@
     "responsive"
   ],
   "version": "3.9.1",
+  "require": {
+    "php": ">=5.3",
+    "composer/installers": "~1.0"
+  },
   "description": "Build responsive page layouts using the widgets you know and love using this simple drag and drop page builder.",
   "homepage": "http://siteorigin.com/page-builder/",
   "license": "GPLv2",
